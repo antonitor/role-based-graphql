@@ -34,6 +34,7 @@ const typeDef = gql`
     login(username: String!, password: String!): Token
     editRole(username: String!, role: String!): User
     editName(username: String!, name: String!): User
+    editPassword(username: String!, password: String!): User
   }
 `;
 
@@ -100,6 +101,69 @@ const resolvers = {
         };
         const token = jwt.sign(userForToken, config.SECRET);
         return { value: token };
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        });
+      }
+    },
+    editRole: async (root, args, context) => {
+      const currentUser = context.currentUser;
+      if (!currentUser) {
+        throw new AuthenticationError("not authenticated");
+      }
+      if (currentUser.role !== "root") {
+        console.log("NO PERMISSION");
+        throw new AuthenticationError("Not Enought Permissions");
+      }
+      try {
+        const user = await User.findOne({ username: args.username });
+        user.role = args.role;
+        const savedUser = await user.save();
+        return savedUser;
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        });
+      }
+    },
+    editName: async (root, args, context) => {
+      const currentUser = context.currentUser;
+      if (!currentUser) {
+        throw new AuthenticationError("not authenticated");
+      }
+      const sameUser = currentUser.username === args.username;
+      if (!sameUser && currentUser.role !== "root") {
+        console.log("Self user? ", sameUser);
+        console.log("Root? ", currentUser.role === "root");
+        throw new AuthenticationError("Not Enought Permissions");
+      }
+      try {
+        const user = await User.findOne({ username: args.username });
+        user.name = args.name;
+        const savedUser = await user.save();
+        return savedUser;
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        });
+      }
+    },
+    editPassword: async (root, args, context) => {
+      const currentUser = context.currentUser;
+      if (!currentUser) {
+        throw new AuthenticationError("not authenticated");
+      }
+      if (currentUser.role !== "root") {
+        console.log("NO PERMISSION");
+        throw new AuthenticationError("Not Enought Permissions");
+      }
+      try {
+        const user = await User.findOne({ username: args.username });
+        const passwordHash = await bcrypt.hash(args.password, 10);
+        user.passwordHash = passwordHash;
+        const savedUser = await user.save();
+        return savedUser;
       } catch (error) {
         throw new UserInputError(error.message, {
           invalidArgs: args,
